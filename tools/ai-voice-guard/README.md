@@ -21,27 +21,30 @@ On macOS/Linux, use `.venv/bin/pip` instead.
 
 ## Login
 
-The app is gated behind a username/password screen. By default (no
-environment variables set) it uses:
+The app is gated behind a username/password screen. There is no hardcoded
+default credential anywhere in the source — nothing to leak, nothing to
+remove from git history later. Instead:
 
-- Username: `admin`
-- Password: `REDACTED`
+- If you haven't set `APP_USERNAME`/`APP_PASSWORD`, the app generates a
+  random password each time the server process starts and prints it to
+  the **server's own console log** (not the web page). Username defaults
+  to `admin`. Check your terminal for a line like:
+  `[AI Voice Guard] No APP_PASSWORD configured — generated a one-time
+  local login password: <random string>`. Use that to log in for this run;
+  it changes the next time you restart the server.
+- For a stable login (recommended once you're not just poking at it
+  locally), set:
+  - `APP_USERNAME` — your chosen username.
+  - `APP_PASSWORD` — your chosen password (hashed in memory before
+    comparison, but it's still simplest to set it as plain text here).
 
-**This default is only meant for local testing.** Before deploying
-anywhere someone else can reach, set these environment variables to your
-own values:
+  Or set `APP_PASSWORD_HASH` instead of `APP_PASSWORD` if you'd rather not
+  have the plaintext password sitting in your environment at all. Generate
+  it with:
 
-- `APP_USERNAME` — your chosen username.
-- `APP_PASSWORD` — your chosen password (the app hashes it in memory, but
-  it's still simplest to just set it as plain text here).
-
-Alternatively, set `APP_PASSWORD_HASH` instead of `APP_PASSWORD` if you'd
-rather not have the plaintext password sitting in your environment at all.
-Generate it with:
-
-```powershell
-python -c "import hashlib; print(hashlib.sha256('yourpassword'.encode()).hexdigest())"
-```
+  ```powershell
+  python -c "import hashlib; print(hashlib.sha256('yourpassword'.encode()).hexdigest())"
+  ```
 
 Be clear-eyed about what this actually is: a lightweight gate to keep
 casual visitors out of a demo, backed by Streamlit's session state. It is
@@ -90,10 +93,15 @@ There are two ways to submit audio:
 - **Record** — click the record button, speak for a few seconds, click
   stop.
 
-Either way, analysis starts automatically, and you can download a JSON
-report of the result via the button below the waveform. The sidebar keeps
-a running history of everything scanned in the current browser session
-(cleared if you refresh the page or restart the server).
+Either way, analysis starts automatically. For clips longer than about
+2.5 seconds, you'll also get a **suspicion timeline** — the clip is
+scored in overlapping 2-second windows so you can see *where* in the
+recording it looks most synthetic, instead of one number averaged across
+the whole thing (useful for spotting a spliced-in or partially-cloned
+segment in an otherwise real recording). You can download a JSON report
+of the full result, timeline included, via the button below. The sidebar
+keeps a running history of everything scanned in the current browser
+session (cleared if you refresh the page or restart the server).
 
 ## Reading the result
 
@@ -116,7 +124,9 @@ this alone.
   the first time. Subsequent runs use the local cache.
 - **Forgot the login password** — check whatever `APP_USERNAME` /
   `APP_PASSWORD` (or `APP_PASSWORD_HASH`) you set in your environment; if
-  none are set, it's the `admin` / `REDACTED` default.
+  none are set, check the server's console log for the generated
+  one-time password (see "Login" above) — restarting the server generates
+  a new one.
 - **Port already in use** — another Streamlit app (or a previous run of
   this one) is still running on port 8501. Close it, or run with
   `--server.port 8502` to use a different port.
