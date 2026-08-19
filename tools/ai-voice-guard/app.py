@@ -398,14 +398,56 @@ def run_model(audio: np.ndarray, model_name: str) -> dict:
     }
 
 
+def compute_timeline(
+    audio: np.ndarray,
+    sr: int,
+    model_name: str,
+    window_s: float = 2.0,
+    hop_s: float = 1.0,
+    max_windows: int = 24,
+) -> list[dict]:
+    """Slide a window over the clip and score each piece independently.
+
+    Turns one whole-clip number into a rough timeline of *where* the model
+    finds the audio most suspicious — a splice or a cloned section in the
+    middle of an otherwise-real recording shows up as a spike, instead of
+    getting averaged away into a single verdict.
+    """
+    duration = len(audio) / sr
+    if duration < window_s * 1.2:
+        return []
+
+    window = int(window_s * sr)
+    hop = int(hop_s * sr)
+    span = len(audio) - window
+    n_windows = span // hop + 1
+    if n_windows > max_windows:
+        hop = max(1, span // (max_windows - 1))
+
+    points = []
+    start = 0
+    while start + window <= len(audio):
+        segment = audio[start:start + window]
+        result = run_model(segment, model_name)
+        points.append({
+            "time": (start + window / 2) / sr,
+            "fake_prob": result["fake_prob"],
+        })
+        start += hop
+    return points
+
+
 def analyze(audio_bytes: bytes, model_names: list[str]) -> dict:
     audio, sr = decode_audio(audio_bytes)
     results = [run_model(audio, name) for name in model_names]
+    timeline = compute_timeline(audio, sr, model_names[0])
     return {
         "results": results,
         "audio": audio,
         "sr": sr,
         "duration": len(audio) / sr,
+        "timeline": timeline,
+        "timeline_model": model_names[0],
     }
 
 
@@ -526,6 +568,52 @@ def render_consensus(results: list[dict]):
     )
 
 
+def _suspicion_color(fake_prob: float) -> str:
+    accent = (0x39, 0xf6, 0xc0)
+    danger = (0xff, 0x55, 0x77)
+    t = max(0.0, min(1.0, fake_prob))
+    r = round(accent[0] + (danger[0] - accent[0]) * t)
+    g = round(accent[1] + (danger[1] - accent[1]) * t)
+    b = round(accent[2] + (danger[2] - accent[2]) * t)
+    return f"rgb({r},{g},{b})"
+
+
+def render_timeline(timeline: list[dict], duration: float, model_name: str):
+    if not timeline:
+        return
+
+    st.caption("SUSPICION TIMELINE")
+    times = [p["time"] for p in timeline]
+    probs_pct = [p["fake_prob"] * 100 for p in timeline]
+    colors = [_suspicion_color(p["fake_prob"]) for p in timeline]
+    bar_width = (times[1] - times[0]) * 0.85 if len(times) > 1 else 1.0
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=times,
+        y=probs_pct,
+        width=bar_width,
+        marker=dict(color=colors, line=dict(width=0)),
+        hovertemplate="%{x:.1f}s · %{y:.0f}% fake<extra></extra>",
+    ))
+    fig.add_hline(y=50, line=dict(color="#7d94a3", width=1, dash="dot"))
+    fig.update_layout(
+        height=140,
+        margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(showgrid=False, color="#7d94a3", title="seconds", range=[0, duration]),
+        yaxis=dict(showgrid=False, color="#7d94a3", range=[0, 100], title="% fake"),
+        showlegend=False,
+        bargap=0.15,
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.caption(
+        f"Each bar is an independent 2s-window score from {model_name} — spikes show where "
+        "the clip itself sounds most synthetic, rather than averaging that away into one number."
+    )
+
+
 def render_result(analysis: dict, source_label: str):
     results = analysis["results"]
     if len(results) == 1:
@@ -535,6 +623,8 @@ def render_result(analysis: dict, source_label: str):
         render_model_grid(results)
         st.caption("WAVEFORM")
         render_waveform(analysis["audio"], analysis["sr"], results[0]["is_fake"])
+
+    render_timeline(analysis["timeline"], analysis["duration"], analysis["timeline_model"])
 
     report = {
         "source": source_label,
@@ -549,6 +639,10 @@ def render_result(analysis: dict, source_label: str):
                 "fake_probability": round(r["fake_prob"], 4),
             }
             for r in results
+        ],
+        "suspicion_timeline": [
+            {"time_seconds": round(p["time"], 2), "fake_probability": round(p["fake_prob"], 4)}
+            for p in analysis["timeline"]
         ],
     }
     st.download_button(

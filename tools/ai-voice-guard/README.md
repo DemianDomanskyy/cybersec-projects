@@ -93,10 +93,15 @@ There are two ways to submit audio:
 - **Record** — click the record button, speak for a few seconds, click
   stop.
 
-Either way, analysis starts automatically, and you can download a JSON
-report of the result via the button below the waveform. The sidebar keeps
-a running history of everything scanned in the current browser session
-(cleared if you refresh the page or restart the server).
+Either way, analysis starts automatically. For clips longer than about
+2.5 seconds, you'll also get a **suspicion timeline** — the clip is
+scored in overlapping 2-second windows so you can see *where* in the
+recording it looks most synthetic, instead of one number averaged across
+the whole thing (useful for spotting a spliced-in or partially-cloned
+segment in an otherwise real recording). You can download a JSON report
+of the full result, timeline included, via the button below. The sidebar
+keeps a running history of everything scanned in the current browser
+session (cleared if you refresh the page or restart the server).
 
 ## Reading the result
 
