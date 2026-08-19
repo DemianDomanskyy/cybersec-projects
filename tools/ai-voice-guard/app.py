@@ -1,9 +1,9 @@
 """AI Voice Guard — detects whether an audio clip is human or AI-generated speech."""
 
 import hashlib
-import io
 import json
 import os
+import secrets
 import tempfile
 import time
 from datetime import datetime
@@ -23,9 +23,6 @@ MODELS = {
 }
 DEFAULT_MODEL = "wav2vec2-XLSR (deepfake voice)"
 
-DEFAULT_USERNAME = "admin"
-DEFAULT_PASSWORD = "REDACTED"
-
 st.set_page_config(
     page_title="AI Voice Guard",
     page_icon="🛡️",
@@ -35,27 +32,47 @@ st.set_page_config(
 
 CSS = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+
 :root {
-    --bg: #0b0f14;
-    --panel: #111820;
-    --panel-border: #1e2a35;
+    --bg: #0a0e13;
+    --panel: #11171f;
+    --panel-2: #161d27;
+    --panel-border: #212b38;
     --accent: #39f6c0;
     --accent-dim: #1c8f74;
-    --danger: #ff4d6d;
+    --accent-glow: rgba(57, 246, 192, 0.35);
+    --danger: #ff5577;
     --danger-dim: #7a1e2e;
-    --text: #e6f1ef;
-    --text-dim: #7d94a3;
+    --danger-glow: rgba(255, 85, 119, 0.3);
+    --text: #eaf3f1;
+    --text-dim: #83a0af;
+    --radius: 14px;
 }
 
-html, body, [class*="css"] { font-family: 'Consolas', 'SF Mono', monospace; }
-.stApp { background: radial-gradient(circle at 20% 0%, #0f1720 0%, var(--bg) 55%); }
+html, body, [class*="css"] {
+    font-family: 'JetBrains Mono', 'Consolas', 'SF Mono', monospace;
+}
+.stApp {
+    background:
+        radial-gradient(circle at 15% -10%, rgba(57,246,192,0.06) 0%, transparent 40%),
+        radial-gradient(circle at 85% 0%, rgba(57,246,192,0.04) 0%, transparent 35%),
+        var(--bg);
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
 
 [data-testid="stSidebar"] {
-    background: var(--panel);
+    background: linear-gradient(180deg, var(--panel) 0%, var(--bg) 100%);
     border-right: 1px solid var(--panel-border);
 }
 
-h1, h2, h3 { color: var(--text) !important; letter-spacing: 0.02em; }
+h1, h2, h3 { color: var(--text) !important; letter-spacing: 0.02em; font-weight: 800 !important; }
+p, span, label, .stMarkdown { color: var(--text); }
+[data-testid="stCaptionContainer"] { color: var(--text-dim) !important; }
 
 .brand {
     display: flex;
@@ -64,50 +81,86 @@ h1, h2, h3 { color: var(--text) !important; letter-spacing: 0.02em; }
     margin-bottom: 0.2rem;
 }
 .brand-title {
-    font-size: 1.6rem;
-    font-weight: 700;
+    font-size: 1.5rem;
+    font-weight: 800;
     color: var(--text);
+    letter-spacing: 0.01em;
 }
 .brand-sub {
     color: var(--text-dim);
-    font-size: 0.85rem;
-    margin-bottom: 1.5rem;
+    font-size: 0.82rem;
+    margin-bottom: 1.4rem;
+    line-height: 1.4;
 }
 
-.stat-card {
+/* --- Login page --- */
+.login-brand {
+    text-align: center;
+    margin: 3.5rem 0 0.5rem;
+}
+.login-shield {
+    font-size: 2.6rem;
+    filter: drop-shadow(0 0 18px var(--accent-glow));
+    margin-bottom: 0.3rem;
+}
+.login-brand .brand-title { font-size: 1.9rem; display: block; }
+.login-sub { color: var(--text-dim); margin-top: 0.3rem; font-size: 0.95rem; }
+/* The login form is the only bordered st.container() in the app, so this
+   selector is safe to target globally. */
+[data-testid="stVerticalBlockBorderWrapper"] {
     background: var(--panel);
+    border-radius: var(--radius) !important;
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,0.6);
+    margin-top: 1rem;
+}
+[data-testid="stVerticalBlockBorderWrapper"] > div {
+    border-color: var(--panel-border) !important;
+    border-radius: var(--radius) !important;
+}
+
+/* --- Sidebar stat cards --- */
+.stat-card {
+    background: var(--panel-2);
     border: 1px solid var(--panel-border);
     border-radius: 10px;
-    padding: 0.9rem 1rem;
-    margin-bottom: 0.7rem;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.6rem;
+    transition: border-color 0.15s ease;
 }
-.stat-label { color: var(--text-dim); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.stat-card:hover { border-color: var(--accent-dim); }
+.stat-label { color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.09em; }
 .stat-value { color: var(--accent); font-size: 1.05rem; font-weight: 700; }
 
+/* --- Verdict card --- */
 .verdict-card {
-    border-radius: 16px;
-    padding: 2rem;
+    border-radius: var(--radius);
+    padding: 2.2rem 2rem;
     text-align: center;
     margin: 1rem 0;
     border: 1px solid;
-    animation: fadein 0.4s ease;
+    animation: fadein 0.45s ease;
+    position: relative;
+    overflow: hidden;
 }
 .verdict-real {
-    background: linear-gradient(135deg, rgba(57,246,192,0.10), rgba(57,246,192,0.02));
+    background: linear-gradient(135deg, rgba(57,246,192,0.12), rgba(57,246,192,0.02));
     border-color: var(--accent-dim);
+    box-shadow: 0 0 60px -25px var(--accent-glow);
 }
 .verdict-fake {
-    background: linear-gradient(135deg, rgba(255,77,109,0.12), rgba(255,77,109,0.02));
+    background: linear-gradient(135deg, rgba(255,85,119,0.14), rgba(255,85,119,0.02));
     border-color: var(--danger-dim);
+    box-shadow: 0 0 60px -25px var(--danger-glow);
 }
-.verdict-label { font-size: 1.8rem; font-weight: 800; letter-spacing: 0.03em; }
+.verdict-label { font-size: 1.9rem; font-weight: 800; letter-spacing: 0.02em; }
 .verdict-real .verdict-label { color: var(--accent); }
 .verdict-fake .verdict-label { color: var(--danger); }
-.verdict-sub { color: var(--text-dim); font-size: 0.95rem; margin-top: 0.3rem; }
+.verdict-sub { color: var(--text-dim); font-size: 0.95rem; margin-top: 0.4rem; }
 
+/* --- Multi-model consensus + comparison --- */
 .consensus-banner {
     border-radius: 12px;
-    padding: 1rem 1.4rem;
+    padding: 1.05rem 1.4rem;
     margin: 0.8rem 0 1.2rem;
     border: 1px solid var(--panel-border);
     background: var(--panel);
@@ -119,42 +172,100 @@ h1, h2, h3 { color: var(--text) !important; letter-spacing: 0.02em; }
     background: var(--panel);
     border: 1px solid var(--panel-border);
     border-radius: 12px;
-    padding: 0.9rem 1rem;
+    padding: 1rem 1.1rem;
     height: 100%;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+    border-top: 3px solid var(--panel-border);
 }
-.model-card-name { font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
-.model-card-verdict { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem; }
+.model-card:hover { transform: translateY(-2px); }
+.model-card-name {
+    font-size: 0.74rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+    min-height: 2.2em;
+}
+.model-card-verdict { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.3rem; }
 .model-card-verdict.fake { color: var(--danger); }
 .model-card-verdict.real { color: var(--accent); }
-.model-card-bar-bg { background: #1e2a35; border-radius: 6px; height: 8px; overflow: hidden; margin-top: 0.5rem; }
-.model-card-bar-fill { height: 100%; border-radius: 6px; }
+.model-card-bar-bg { background: #1a232e; border-radius: 6px; height: 7px; overflow: hidden; margin-top: 0.6rem; }
+.model-card-bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
 
-@keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
+/* --- Scan history --- */
 .history-row {
     display: flex;
     justify-content: space-between;
-    padding: 0.5rem 0.7rem;
+    padding: 0.55rem 0.7rem;
     border-bottom: 1px solid var(--panel-border);
-    font-size: 0.85rem;
+    font-size: 0.83rem;
     color: var(--text-dim);
 }
-.history-row span.tag-real { color: var(--accent); font-weight: 600; }
-.history-row span.tag-fake { color: var(--danger); font-weight: 600; }
+.history-row:last-child { border-bottom: none; }
+.history-row span.tag-real { color: var(--accent); font-weight: 700; }
+.history-row span.tag-fake { color: var(--danger); font-weight: 700; }
 
+/* --- Upload / record widgets --- */
 section[data-testid="stFileUploaderDropzone"], div[data-testid="stAudioInput"] {
     background: var(--panel) !important;
     border: 1px dashed var(--panel-border) !important;
-    border-radius: 12px !important;
+    border-radius: var(--radius) !important;
+    transition: border-color 0.15s ease;
+}
+section[data-testid="stFileUploaderDropzone"]:hover, div[data-testid="stAudioInput"]:hover {
+    border-color: var(--accent-dim) !important;
 }
 
+/* --- Tabs --- */
 .stTabs [data-baseweb="tab-list"] { gap: 4px; }
 .stTabs [data-baseweb="tab"] {
     background: var(--panel);
     border-radius: 8px 8px 0 0;
     color: var(--text-dim);
+    font-weight: 600;
 }
 .stTabs [aria-selected="true"] { color: var(--accent) !important; }
+.stTabs [data-baseweb="tab-highlight"] { background-color: var(--accent) !important; }
+
+/* --- Buttons --- */
+.stButton button, .stDownloadButton button, .stFormSubmitButton button {
+    border-radius: 10px !important;
+    border: 1px solid var(--panel-border) !important;
+    background: var(--panel-2) !important;
+    color: var(--text) !important;
+    font-weight: 600 !important;
+    transition: border-color 0.15s ease, transform 0.1s ease !important;
+}
+.stButton button:hover, .stDownloadButton button:hover, .stFormSubmitButton button:hover {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    transform: translateY(-1px);
+}
+.stFormSubmitButton button[kind="primaryFormSubmit"] {
+    background: linear-gradient(135deg, var(--accent-dim), var(--accent)) !important;
+    color: #06231b !important;
+    border: none !important;
+}
+.stFormSubmitButton button[kind="primaryFormSubmit"]:hover { color: #06231b !important; }
+
+/* --- Multiselect tags: swap Streamlit's alarm-red default for the accent color --- */
+span[data-tag] {
+    background: rgba(57,246,192,0.16) !important;
+    border-radius: 6px !important;
+}
+span[data-tag] span, span[data-tag] button { color: var(--accent) !important; }
+span[data-tag] svg { stroke: var(--accent) !important; }
+
+[data-testid="stTextInput"] input {
+    background: var(--panel-2) !important;
+    border-color: var(--panel-border) !important;
+    color: var(--text) !important;
+}
+[data-testid="stTextInput"] input:focus { border-color: var(--accent) !important; }
+
+hr { border-color: var(--panel-border) !important; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -166,59 +277,71 @@ st.markdown(CSS, unsafe_allow_html=True)
 # handles anything sensitive.
 # ---------------------------------------------------------------------------
 
+@st.cache_resource(show_spinner=False)
+def _generated_demo_password() -> str:
+    """A random password generated once per running server process.
+
+    Never hardcoded, never committed — printed only to the server's own
+    console log, so whoever has access to the machine/logs running the app
+    can read it, but no credential ever sits in source control.
+    """
+    pw = secrets.token_urlsafe(9)
+    print(
+        f"\n[AI Voice Guard] No APP_PASSWORD configured — generated a "
+        f"one-time local login password: {pw}\n",
+        flush=True,
+    )
+    return pw
+
+
 def _resolve_credentials():
-    username = os.environ.get("APP_USERNAME", DEFAULT_USERNAME)
-    using_default = True
+    username = os.environ.get("APP_USERNAME", "admin")
     if "APP_PASSWORD_HASH" in os.environ:
-        password_hash = os.environ["APP_PASSWORD_HASH"]
-        using_default = False
-    elif "APP_PASSWORD" in os.environ:
-        password_hash = hashlib.sha256(os.environ["APP_PASSWORD"].encode()).hexdigest()
-        using_default = False
-    else:
-        password_hash = hashlib.sha256(DEFAULT_PASSWORD.encode()).hexdigest()
-    return username, password_hash, using_default
+        return username, os.environ["APP_PASSWORD_HASH"], False
+    if "APP_PASSWORD" in os.environ:
+        return username, hashlib.sha256(os.environ["APP_PASSWORD"].encode()).hexdigest(), False
+    generated = _generated_demo_password()
+    return username, hashlib.sha256(generated.encode()).hexdigest(), True
 
 
 def require_login() -> bool:
     if st.session_state.get("authenticated"):
         return True
 
-    username, password_hash, using_default = _resolve_credentials()
+    username, password_hash, using_generated = _resolve_credentials()
 
     st.markdown(
-        """<div class="brand" style="margin-top:3rem; justify-content:center;">
-                <div style="font-size:2rem;">🛡️</div>
-                <div class="brand-title" style="font-size:2rem;">AI Voice Guard</div>
+        """<div class="login-brand">
+                <div class="login-shield">🛡️</div>
+                <div class="brand-title">AI Voice Guard</div>
+                <p class="login-sub">Sign in to continue</p>
            </div>""",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        "<p style='text-align:center; color:var(--text-dim);'>Sign in to continue</p>",
         unsafe_allow_html=True,
     )
 
     _, col, _ = st.columns([1, 1.2, 1])
     with col:
-        if using_default:
-            st.warning(
-                f"Using default demo credentials (`{DEFAULT_USERNAME}` / `{DEFAULT_PASSWORD}`). "
-                "Set `APP_USERNAME` and `APP_PASSWORD` environment variables before deploying "
-                "this anywhere public.",
-                icon="⚠️",
-            )
-        with st.form("login_form"):
-            user_in = st.text_input("Username")
-            pass_in = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Log in", use_container_width=True)
+        with st.container(border=True):
+            if using_generated:
+                st.warning(
+                    f"No `APP_PASSWORD` configured — using username `{username}` with a "
+                    "one-time password printed to the server's console log for this run. "
+                    "Set `APP_USERNAME`/`APP_PASSWORD` env vars for a stable login "
+                    "before deploying this anywhere public.",
+                    icon="⚠️",
+                )
+            with st.form("login_form"):
+                user_in = st.text_input("Username")
+                pass_in = st.text_input("Password", type="password")
+                submitted = st.form_submit_button("Log in", use_container_width=True)
 
-        if submitted:
-            pass_hash_in = hashlib.sha256(pass_in.encode()).hexdigest()
-            if user_in == username and pass_hash_in == password_hash:
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Wrong username or password.")
+            if submitted:
+                pass_hash_in = hashlib.sha256(pass_in.encode()).hexdigest()
+                if user_in == username and pass_hash_in == password_hash:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Wrong username or password.")
 
     return False
 
