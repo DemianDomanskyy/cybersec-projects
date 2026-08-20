@@ -270,10 +270,18 @@ async function runAnalysis(blob, filename) {
 }
 
 function suspicionColor(fakeProb) {
-  const accent = [0x39, 0xf6, 0xc0];
-  const danger = [0xff, 0x55, 0x77];
+  // Warm sunset (Tangerine Dream) sliding through Blush Rose into
+  // Grape Soda as suspicion climbs, matching the app's palette.
+  const stops = [
+    [0xfc, 0xa1, 0x7d], // accent — Tangerine Dream
+    [0xda, 0x62, 0x7d], // danger — Blush Rose
+    [0x9a, 0x34, 0x8e], // danger-dim — Grape Soda
+  ];
   const t = Math.max(0, Math.min(1, fakeProb));
-  const rgb = accent.map((c, i) => Math.round(c + (danger[i] - c) * t));
+  const scaled = t * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(scaled));
+  const localT = scaled - i;
+  const rgb = stops[i].map((c, k) => Math.round(c + (stops[i + 1][k] - c) * localT));
   return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
 }
 
@@ -293,6 +301,7 @@ function renderResults(analysis, sourceLabel, elapsed) {
   chartRow.className = "chart-row chart-section";
 
   const waveDiv = document.createElement("div");
+  waveDiv.className = "chart-box";
   const waveCaption = document.createElement("div");
   waveCaption.className = "chart-caption";
   waveCaption.textContent = results.length === 1 ? "" : "WAVEFORM";
@@ -302,6 +311,7 @@ function renderResults(analysis, sourceLabel, elapsed) {
 
   if (results.length === 1) {
     const gaugeDiv = document.createElement("div");
+    gaugeDiv.className = "chart-box";
     const gaugeCaption = document.createElement("div");
     gaugeCaption.className = "chart-caption";
     gaugeCaption.textContent = "FAKE-VOICE PROBABILITY";
@@ -321,12 +331,15 @@ function renderResults(analysis, sourceLabel, elapsed) {
     const tCaption = document.createElement("div");
     tCaption.className = "chart-caption chart-section";
     tCaption.textContent = "SUSPICION TIMELINE";
+    const tBox = document.createElement("div");
+    tBox.className = "chart-box";
     const tPlot = document.createElement("div");
     const tNote = document.createElement("p");
     tNote.className = "dim small";
     tNote.textContent = `Each bar is an independent 2s-window score from ${analysis.timeline_model} — spikes show where the clip itself sounds most synthetic, rather than averaging that away into one number.`;
+    tBox.appendChild(tPlot);
     container.appendChild(tCaption);
-    container.appendChild(tPlot);
+    container.appendChild(tBox);
     container.appendChild(tNote);
     plotTimeline(tPlot, analysis.timeline, analysis.duration);
   }
@@ -376,7 +389,7 @@ function buildModelGrid(results) {
     const card = document.createElement("div");
     card.className = "model-card";
     const tag = r.is_fake ? "fake" : "real";
-    const color = r.is_fake ? "#ff5577" : "#39f6c0";
+    const color = r.is_fake ? "#DA627D" : "#FCA17D";
     const verdictText = r.is_fake ? "AI-generated" : "Human";
     card.innerHTML = `
       <div class="model-card-name">${escapeHtml(r.model_name)}</div>
@@ -390,47 +403,47 @@ function buildModelGrid(results) {
 }
 
 function plotGauge(el, fakeProb) {
-  const color = fakeProb > 0.5 ? "#ff5577" : "#39f6c0";
+  const color = fakeProb > 0.5 ? "#DA627D" : "#FCA17D";
   Plotly.newPlot(el, [{
     type: "indicator",
     mode: "gauge+number",
     value: fakeProb * 100,
     number: { suffix: "%", font: { color, size: 34 } },
     gauge: {
-      axis: { range: [0, 100], tickcolor: "#7d94a3", tickfont: { color: "#7d94a3" } },
+      axis: { range: [0, 100], tickcolor: "#B79A8C", tickfont: { color: "#B79A8C" } },
       bar: { color },
-      bgcolor: "#111820",
+      bgcolor: "#1B0E33",
       borderwidth: 0,
       steps: [
-        { range: [0, 50], color: "rgba(57,246,192,0.10)" },
-        { range: [50, 100], color: "rgba(255,85,119,0.10)" },
+        { range: [0, 50], color: "rgba(252,161,125,0.12)" },
+        { range: [50, 100], color: "rgba(218,98,125,0.12)" },
       ],
-      threshold: { line: { color: "#e6f1ef", width: 2 }, thickness: 0.8, value: 50 },
+      threshold: { line: { color: "#F9DBBD", width: 2 }, thickness: 0.8, value: 50 },
     },
   }], {
     height: 200,
     margin: { l: 20, r: 20, t: 30, b: 10 },
     paper_bgcolor: "rgba(0,0,0,0)",
-    font: { color: "#7d94a3" },
+    font: { color: "#B79A8C" },
   }, { displayModeBar: false, responsive: true });
 }
 
 function plotWaveform(el, waveform, isFake) {
-  const color = isFake ? "#ff5577" : "#39f6c0";
+  const color = isFake ? "#DA627D" : "#FCA17D";
   Plotly.newPlot(el, [{
     type: "scatter",
     x: waveform.x,
     y: waveform.y,
     line: { color, width: 1 },
     fill: "tozeroy",
-    fillcolor: color === "#ff5577" ? "rgba(255,85,119,0.15)" : "rgba(57,246,192,0.15)",
+    fillcolor: isFake ? "rgba(218,98,125,0.18)" : "rgba(252,161,125,0.18)",
   }], {
     height: 160,
     margin: { l: 0, r: 0, t: 10, b: 0 },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
-    xaxis: { showgrid: false, color: "#7d94a3", title: "seconds" },
-    yaxis: { showgrid: false, color: "#7d94a3", showticklabels: false },
+    xaxis: { showgrid: false, color: "#B79A8C", title: "seconds" },
+    yaxis: { showgrid: false, color: "#B79A8C", showticklabels: false },
     showlegend: false,
   }, { displayModeBar: false, responsive: true });
 }
@@ -446,18 +459,18 @@ function plotTimeline(el, timeline, duration) {
     x: times,
     y: probs,
     width,
-    marker: { color: colors, line: { width: 0 } },
+    marker: { color: colors, line: { width: 0 }, cornerradius: 6 },
     hovertemplate: "%{x:.1f}s · %{y:.0f}%% fake<extra></extra>",
   }], {
     height: 140,
     margin: { l: 0, r: 0, t: 10, b: 0 },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
-    xaxis: { showgrid: false, color: "#7d94a3", title: "seconds", range: [0, duration] },
-    yaxis: { showgrid: false, color: "#7d94a3", range: [0, 100], title: "% fake" },
-    shapes: [{ type: "line", x0: 0, x1: duration, y0: 50, y1: 50, line: { color: "#7d94a3", width: 1, dash: "dot" } }],
+    xaxis: { showgrid: false, color: "#B79A8C", title: "seconds", range: [0, duration] },
+    yaxis: { showgrid: false, color: "#B79A8C", range: [0, 100], title: "% fake" },
+    shapes: [{ type: "line", x0: 0, x1: duration, y0: 50, y1: 50, line: { color: "#B79A8C", width: 1, dash: "dot" } }],
     showlegend: false,
-    bargap: 0.15,
+    bargap: 0.2,
   }, { displayModeBar: false, responsive: true });
 }
 
