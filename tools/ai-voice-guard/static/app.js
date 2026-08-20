@@ -186,13 +186,29 @@ $("#record-btn").addEventListener("click", async () => {
   recorder.ondataavailable = (e) => {
     if (e.data.size > 0) state.recordedChunks.push(e.data);
   };
-  recorder.onstop = () => {
+  recorder.onstop = async () => {
     stream.getTracks().forEach((t) => t.stop());
     btn.textContent = "Start recording";
     btn.classList.remove("recording");
-    status.textContent = "";
-    const blob = new Blob(state.recordedChunks, { type: "audio/webm" });
-    handleFile(blob, "mic-recording.webm");
+    btn.disabled = true;
+    status.textContent = "Converting…";
+
+    // MediaRecorder only produces compressed containers (webm/Opus in
+    // Chrome/Firefox) — the backend's audio decoder (soundfile/librosa)
+    // can't open those without ffmpeg installed, which we don't want to
+    // require. Decode it with the Web Audio API and re-encode as plain
+    // WAV in the browser instead, so the backend only ever has to handle
+    // a format it already supports natively.
+    const rawBlob = new Blob(state.recordedChunks, { type: "audio/webm" });
+    try {
+      const wavBlob = await blobToWav(rawBlob);
+      status.textContent = "";
+      handleFile(wavBlob, "mic-recording.wav");
+    } catch (err) {
+      status.textContent = "Couldn't process the recording: " + err;
+    } finally {
+      btn.disabled = false;
+    }
   };
 
   recorder.start();
@@ -200,6 +216,62 @@ $("#record-btn").addEventListener("click", async () => {
   btn.classList.add("recording");
   status.textContent = "Recording…";
 });
+
+async function blobToWav(blob) {
+  const arrayBuffer = await blob.arrayBuffer();
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioCtx();
+  let audioBuffer;
+  try {
+    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  } finally {
+    audioCtx.close();
+  }
+  return audioBufferToWavBlob(audioBuffer);
+}
+
+function audioBufferToWavBlob(audioBuffer) {
+  const numChannels = audioBuffer.numberOfChannels;
+  const sampleRate = audioBuffer.sampleRate;
+  const numFrames = audioBuffer.length;
+  const bytesPerSample = 2; // 16-bit PCM
+  const blockAlign = numChannels * bytesPerSample;
+  const dataSize = numFrames * blockAlign;
+
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const writeString = (offset, str) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  };
+
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true); // fmt chunk size (PCM)
+  view.setUint16(20, 1, true); // audio format: 1 = PCM
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true); // byte rate
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true); // bits per sample
+  writeString(36, "data");
+  view.setUint32(40, dataSize, true);
+
+  const channelData = [];
+  for (let ch = 0; ch < numChannels; ch++) channelData.push(audioBuffer.getChannelData(ch));
+
+  let offset = 44;
+  for (let i = 0; i < numFrames; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const sample = Math.max(-1, Math.min(1, channelData[ch][i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += 2;
+    }
+  }
+
+  return new Blob([buffer], { type: "audio/wav" });
+}
 
 // ---------------------------------------------------------------------
 // Analysis

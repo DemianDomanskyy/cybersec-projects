@@ -91,5 +91,14 @@ async def analyze(
 
     audio_bytes = await file.read()
     suffix = Path(file.filename or "clip.wav").suffix or ".wav"
-    result = inference.analyze(audio_bytes, model_names, suffix=suffix)
+    try:
+        result = inference.analyze(audio_bytes, model_names, suffix=suffix)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Could not decode this audio — try a WAV, MP3, FLAC, M4A, "
+                f"or OGG file instead. ({exc})"
+            ),
+        ) from exc
     return result
