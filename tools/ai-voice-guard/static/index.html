@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Voice Guard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+
+<div id="login-view" class="login-wrap">
+  <div class="login-brand">
+    <div class="login-shield">🛡️</div>
+    <div class="brand-title">AI Voice Guard</div>
+    <p class="login-sub">Sign in to continue</p>
+  </div>
+  <div class="login-col">
+    <div id="login-error" class="alert alert-error" hidden></div>
+    <form id="login-form" class="card login-card">
+      <label for="login-username">Username</label>
+      <input id="login-username" name="username" type="text" autocomplete="username" required>
+      <label for="login-password">Password</label>
+      <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit" class="btn btn-primary" id="login-submit">Log in</button>
+    </form>
+  </div>
+</div>
+
+<div id="app-view" hidden>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">🛡️</div>
+        <div class="brand-title">AI Voice Guard</div>
+      </div>
+      <div class="brand-sub">Checks whether a clip is a real voice or AI-generated</div>
+
+      <label class="field-label" for="model-picker">Models to run</label>
+      <div id="model-picker" class="model-picker"></div>
+
+      <div class="stat-card">
+        <div class="stat-label">Active models</div>
+        <div class="stat-value" id="active-model-count">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Architecture</div>
+        <div class="stat-value">wav2vec2 family</div>
+      </div>
+
+      <hr>
+      <div class="field-label">Scan history</div>
+      <div id="history-list" class="history-list">
+        <p class="dim">No scans yet this session.</p>
+      </div>
+
+      <hr>
+      <button id="logout-btn" class="btn">Log out</button>
+    </aside>
+
+    <main class="main">
+      <h1>Voice Scanner</h1>
+      <p class="dim">Upload a clip or record one — it'll tell you whether the voice sounds real or synthetic.</p>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="upload">Upload</button>
+        <button class="tab-btn" data-tab="record">Record</button>
+      </div>
+
+      <div id="tab-upload" class="tab-panel active">
+        <p class="dim small">WAV, MP3, FLAC, M4A, or OGG</p>
+        <div id="dropzone" class="dropzone">
+          <span>Drop a file here or click to browse</span>
+          <input id="file-input" type="file" accept=".wav,.mp3,.flac,.m4a,.ogg,audio/*" hidden>
+        </div>
+      </div>
+
+      <div id="tab-record" class="tab-panel">
+        <p class="dim">Record a few seconds from your mic.</p>
+        <button id="record-btn" class="btn btn-primary">Start recording</button>
+        <span id="record-status" class="dim"></span>
+      </div>
+
+      <audio id="audio-preview" controls hidden></audio>
+
+      <div id="results"></div>
+    </main>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
