@@ -448,8 +448,9 @@ function renderResults(analysis, sourceLabel, elapsed) {
   waveCaption.className = "chart-caption";
   waveCaption.textContent = results.length === 1 ? "" : "WAVEFORM";
   const wavePlot = document.createElement("div");
-  waveDiv.appendChild(waveCaption);
-  waveDiv.appendChild(wavePlot);
+  wavePlot.style.minHeight = "160px"; // matches plotWaveform's layout.height — reserves
+  waveDiv.appendChild(waveCaption);   // space up front so the page doesn't jump once
+  waveDiv.appendChild(wavePlot);      // Plotly's async render actually fills it in
 
   if (results.length === 1) {
     const gaugeDiv = document.createElement("div");
@@ -458,6 +459,7 @@ function renderResults(analysis, sourceLabel, elapsed) {
     gaugeCaption.className = "chart-caption";
     gaugeCaption.textContent = "FAKE-VOICE PROBABILITY";
     const gaugePlot = document.createElement("div");
+    gaugePlot.style.minHeight = "200px"; // matches plotGauge's layout.height
     gaugeDiv.appendChild(gaugeCaption);
     gaugeDiv.appendChild(gaugePlot);
     chartRow.appendChild(gaugeDiv);
@@ -476,6 +478,7 @@ function renderResults(analysis, sourceLabel, elapsed) {
     const sBox = document.createElement("div");
     sBox.className = "chart-box";
     const sPlot = document.createElement("div");
+    sPlot.style.minHeight = "170px"; // matches plotSpectrogram's layout.height
     sBox.appendChild(sPlot);
     container.appendChild(sCaption);
     container.appendChild(sBox);
@@ -489,6 +492,7 @@ function renderResults(analysis, sourceLabel, elapsed) {
     const tBox = document.createElement("div");
     tBox.className = "chart-box";
     const tPlot = document.createElement("div");
+    tPlot.style.minHeight = "140px"; // matches plotTimeline's layout.height
     const tNote = document.createElement("p");
     tNote.className = "dim small";
     tNote.textContent = `Each bar is an independent 2s-window score from ${analysis.timeline_model} — spikes show where the clip itself sounds most synthetic, rather than averaging that away into one number.`;
