@@ -5,8 +5,6 @@ const state = {
   defaultModel: null,
   selectedModels: [],
   history: JSON.parse(sessionStorage.getItem("vg_history") || "[]"),
-  mediaRecorder: null,
-  recordedChunks: [],
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -159,18 +157,33 @@ function handleFile(blob, filename) {
 }
 
 // ---------------------------------------------------------------------
-// Record
+// Record — captures raw PCM directly (via ScriptProcessorNode) instead of
+// MediaRecorder, for two reasons: it lets us score a live rolling window
+// while recording is still happening (MediaRecorder's blob only exists
+// after you stop), and it sidesteps the webm/Opus decode problem the
+// backend previously hit entirely, since we encode straight to WAV.
 // ---------------------------------------------------------------------
 
-$("#record-btn").addEventListener("click", async () => {
-  const btn = $("#record-btn");
-  const status = $("#record-status");
+let recordCtx = null;
+let recordProcessor = null;
+let recordSource = null;
+let recordSilentGain = null;
+let recordStream = null;
+let recordedChunks = []; // array of Float32Array, appended as the mic streams in
+let recordSampleRate = null;
+let liveTickTimer = null;
+let liveAnalysisInFlight = false;
 
-  if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
-    state.mediaRecorder.stop();
+const LIVE_TICK_MS = 1500;
+const LIVE_WINDOW_S = 2.0;
+
+$("#record-btn").addEventListener("click", async () => {
+  if (recordCtx) {
+    stopRecording();
     return;
   }
 
+  const status = $("#record-status");
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -179,65 +192,127 @@ $("#record-btn").addEventListener("click", async () => {
     return;
   }
 
-  state.recordedChunks = [];
-  const recorder = new MediaRecorder(stream);
-  state.mediaRecorder = recorder;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  recordCtx = new AudioCtx();
+  recordSampleRate = recordCtx.sampleRate;
+  recordStream = stream;
+  recordedChunks = [];
 
-  recorder.ondataavailable = (e) => {
-    if (e.data.size > 0) state.recordedChunks.push(e.data);
-  };
-  recorder.onstop = async () => {
-    stream.getTracks().forEach((t) => t.stop());
-    btn.textContent = "Start recording";
-    btn.classList.remove("recording");
-    btn.disabled = true;
-    status.textContent = "Converting…";
-
-    // MediaRecorder only produces compressed containers (webm/Opus in
-    // Chrome/Firefox) — the backend's audio decoder (soundfile/librosa)
-    // can't open those without ffmpeg installed, which we don't want to
-    // require. Decode it with the Web Audio API and re-encode as plain
-    // WAV in the browser instead, so the backend only ever has to handle
-    // a format it already supports natively.
-    const rawBlob = new Blob(state.recordedChunks, { type: "audio/webm" });
-    try {
-      const wavBlob = await blobToWav(rawBlob);
-      status.textContent = "";
-      handleFile(wavBlob, "mic-recording.wav");
-    } catch (err) {
-      status.textContent = "Couldn't process the recording: " + err;
-    } finally {
-      btn.disabled = false;
-    }
+  recordSource = recordCtx.createMediaStreamSource(stream);
+  recordProcessor = recordCtx.createScriptProcessor(4096, 1, 1);
+  recordProcessor.onaudioprocess = (e) => {
+    // copy the buffer — the engine reuses the same backing array next callback
+    recordedChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
   };
 
-  recorder.start();
+  // Chrome only fires onaudioprocess while the node is connected all the
+  // way to a destination. Route through a muted gain so nothing is
+  // actually played back (avoids feedback/echo) while keeping the graph
+  // "live" enough to keep processing audio.
+  recordSilentGain = recordCtx.createGain();
+  recordSilentGain.gain.value = 0;
+  recordSource.connect(recordProcessor);
+  recordProcessor.connect(recordSilentGain);
+  recordSilentGain.connect(recordCtx.destination);
+
+  const btn = $("#record-btn");
   btn.textContent = "Stop recording";
   btn.classList.add("recording");
   status.textContent = "Recording…";
+
+  $("#live-gauge-wrap").hidden = false;
+  liveTickTimer = setInterval(runLiveTick, LIVE_TICK_MS);
 });
 
-async function blobToWav(blob) {
-  const arrayBuffer = await blob.arrayBuffer();
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const audioCtx = new AudioCtx();
-  let audioBuffer;
-  try {
-    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-  } finally {
-    audioCtx.close();
+function stopRecording() {
+  clearInterval(liveTickTimer);
+  liveTickTimer = null;
+
+  recordProcessor.disconnect();
+  recordSource.disconnect();
+  recordSilentGain.disconnect();
+  recordCtx.close();
+  recordStream.getTracks().forEach((t) => t.stop());
+
+  const btn = $("#record-btn");
+  const status = $("#record-status");
+  btn.textContent = "Start recording";
+  btn.classList.remove("recording");
+  status.textContent = "";
+  $("#live-gauge-wrap").hidden = true;
+
+  const merged = concatFloat32(recordedChunks);
+  const sampleRate = recordSampleRate;
+  recordedChunks = [];
+  recordCtx = null;
+  recordProcessor = null;
+  recordSource = null;
+  recordSilentGain = null;
+  recordStream = null;
+
+  if (merged.length < sampleRate * 0.3) {
+    status.textContent = "Recording was too short — try again.";
+    return;
   }
-  return audioBufferToWavBlob(audioBuffer);
+
+  handleFile(encodeWavMono(merged, sampleRate), "mic-recording.wav");
 }
 
-function audioBufferToWavBlob(audioBuffer) {
-  const numChannels = audioBuffer.numberOfChannels;
-  const sampleRate = audioBuffer.sampleRate;
-  const numFrames = audioBuffer.length;
-  const bytesPerSample = 2; // 16-bit PCM
-  const blockAlign = numChannels * bytesPerSample;
-  const dataSize = numFrames * blockAlign;
+// Scores roughly the last LIVE_WINDOW_S seconds of what's been captured so
+// far, without the timeline/waveform/spectrogram extras — this fires every
+// LIVE_TICK_MS while recording, so it needs to stay cheap. Failures are
+// silent: the live meter is a preview, not the result: the real analysis
+// (with everything selected) runs once on the full clip after you stop.
+async function runLiveTick() {
+  if (liveAnalysisInFlight) return;
+  const windowSamples = Math.floor(recordSampleRate * LIVE_WINDOW_S);
+  const flat = lastNSamples(recordedChunks, windowSamples);
+  if (flat.length < recordSampleRate * 0.5) return;
 
+  liveAnalysisInFlight = true;
+  try {
+    const wavBlob = encodeWavMono(flat, recordSampleRate);
+    const form = new FormData();
+    form.append("file", wavBlob, "live-tick.wav");
+    form.append("models", JSON.stringify([state.selectedModels[0] || state.defaultModel]));
+    form.append("extras", "false");
+    const res = await fetch("/api/analyze", { method: "POST", body: form });
+    if (res.ok) {
+      const data = await res.json();
+      updateLiveGauge(data.results[0].fake_prob);
+    }
+  } catch (err) {
+    // ignore — see comment above
+  } finally {
+    liveAnalysisInFlight = false;
+  }
+}
+
+function lastNSamples(chunks, maxSamples) {
+  let total = 0;
+  let startIdx = chunks.length;
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    total += chunks[i].length;
+    startIdx = i;
+    if (total >= maxSamples) break;
+  }
+  const merged = concatFloat32(chunks.slice(startIdx));
+  return merged.length > maxSamples ? merged.slice(merged.length - maxSamples) : merged;
+}
+
+function concatFloat32(chunks) {
+  const total = chunks.reduce((s, c) => s + c.length, 0);
+  const merged = new Float32Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    merged.set(c, offset);
+    offset += c.length;
+  }
+  return merged;
+}
+
+function encodeWavMono(samples, sampleRate) {
+  const dataSize = samples.length * 2; // 16-bit PCM, mono
   const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);
   const writeString = (offset, str) => {
@@ -248,26 +323,21 @@ function audioBufferToWavBlob(audioBuffer) {
   view.setUint32(4, 36 + dataSize, true);
   writeString(8, "WAVE");
   writeString(12, "fmt ");
-  view.setUint32(16, 16, true); // fmt chunk size (PCM)
-  view.setUint16(20, 1, true); // audio format: 1 = PCM
-  view.setUint16(22, numChannels, true);
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * blockAlign, true); // byte rate
-  view.setUint16(32, blockAlign, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true); // block align
   view.setUint16(34, 16, true); // bits per sample
   writeString(36, "data");
   view.setUint32(40, dataSize, true);
 
-  const channelData = [];
-  for (let ch = 0; ch < numChannels; ch++) channelData.push(audioBuffer.getChannelData(ch));
-
   let offset = 44;
-  for (let i = 0; i < numFrames; i++) {
-    for (let ch = 0; ch < numChannels; ch++) {
-      const sample = Math.max(-1, Math.min(1, channelData[ch][i]));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-      offset += 2;
-    }
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
   }
 
   return new Blob([buffer], { type: "audio/wav" });
@@ -399,6 +469,19 @@ function renderResults(analysis, sourceLabel, elapsed) {
   container.appendChild(chartRow);
   plotWaveform(wavePlot, analysis.waveform, results[0].is_fake);
 
+  if (analysis.spectrogram) {
+    const sCaption = document.createElement("div");
+    sCaption.className = "chart-caption chart-section";
+    sCaption.textContent = "SPECTROGRAM";
+    const sBox = document.createElement("div");
+    sBox.className = "chart-box";
+    const sPlot = document.createElement("div");
+    sBox.appendChild(sPlot);
+    container.appendChild(sCaption);
+    container.appendChild(sBox);
+    plotSpectrogram(sPlot, analysis.spectrogram);
+  }
+
   if (analysis.timeline && analysis.timeline.length) {
     const tCaption = document.createElement("div");
     tCaption.className = "chart-caption chart-section";
@@ -500,6 +583,37 @@ function plotGauge(el, fakeProb) {
   }, { displayModeBar: false, responsive: true });
 }
 
+// Same visual as plotGauge but targets the fixed #live-gauge element via
+// Plotly.react (an in-place diff/update) instead of newPlot, so repeated
+// calls during a live recording animate smoothly instead of flashing.
+function updateLiveGauge(fakeProb) {
+  const el = $("#live-gauge");
+  const color = fakeProb > 0.5 ? "#DA627D" : "#FCA17D";
+  Plotly.react(el, [{
+    type: "indicator",
+    mode: "gauge+number",
+    value: fakeProb * 100,
+    number: { suffix: "%", font: { color, size: 34 } },
+    gauge: {
+      axis: { range: [0, 100], tickcolor: "#B79A8C", tickfont: { color: "#B79A8C" } },
+      bar: { color },
+      bgcolor: "#1B0E33",
+      borderwidth: 0,
+      steps: [
+        { range: [0, 50], color: "rgba(252,161,125,0.12)" },
+        { range: [50, 100], color: "rgba(218,98,125,0.12)" },
+      ],
+      threshold: { line: { color: "#F9DBBD", width: 2 }, thickness: 0.8, value: 50 },
+    },
+  }], {
+    height: 180,
+    margin: { l: 20, r: 20, t: 20, b: 10 },
+    paper_bgcolor: "rgba(0,0,0,0)",
+    font: { color: "#B79A8C" },
+    transition: { duration: 300, easing: "cubic-in-out" },
+  }, { displayModeBar: false, responsive: true });
+}
+
 function plotWaveform(el, waveform, isFake) {
   const color = isFake ? "#DA627D" : "#FCA17D";
   Plotly.newPlot(el, [{
@@ -543,6 +657,37 @@ function plotTimeline(el, timeline, duration) {
     shapes: [{ type: "line", x0: 0, x1: duration, y0: 50, y1: 50, line: { color: "#B79A8C", width: 1, dash: "dot" } }],
     showlegend: false,
     bargap: 0.2,
+  }, { displayModeBar: false, responsive: true });
+}
+
+function plotSpectrogram(el, spectrogram) {
+  const z = spectrogram.z; // [n_mels][frames], dB
+  const numFrames = z[0].length;
+  const x = Array.from({ length: numFrames }, (_, i) =>
+    numFrames > 1 ? (i / (numFrames - 1)) * spectrogram.duration : 0
+  );
+  const y = Array.from({ length: spectrogram.n_mels }, (_, i) => i);
+
+  Plotly.newPlot(el, [{
+    type: "heatmap",
+    z, x, y,
+    zsmooth: "best",
+    showscale: false,
+    colorscale: [
+      [0, "#0D0628"],
+      [0.35, "#3C2159"],
+      [0.65, "#9A348E"],
+      [0.85, "#DA627D"],
+      [1, "#FCA17D"],
+    ],
+    hovertemplate: "%{x:.1f}s<extra></extra>",
+  }], {
+    height: 170,
+    margin: { l: 30, r: 0, t: 10, b: 25 },
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    xaxis: { showgrid: false, color: "#B79A8C", title: "seconds" },
+    yaxis: { showgrid: false, color: "#B79A8C", title: "mel bin", showticklabels: false },
   }, { displayModeBar: false, responsive: true });
 }
 

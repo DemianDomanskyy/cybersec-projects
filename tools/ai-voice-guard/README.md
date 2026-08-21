@@ -107,16 +107,30 @@ There are two ways to submit audio:
 - **Upload** — drag a file onto the dropzone, or click it to browse.
   Accepts WAV, MP3, FLAC, M4A, or OGG.
 - **Record** — click to start recording from your microphone (the browser
-  will ask for permission), click again to stop.
+  will ask for permission). While you're recording, a **live gauge**
+  updates every ~1.5 seconds with a real-time fake-probability reading
+  from whatever's been captured so far (scored with just your first
+  selected model, to keep it fast) — a live preview, not the final
+  answer. Click the button again to stop; the complete recording is then
+  run through the full analysis below, exactly like an uploaded file.
 
-Either way, analysis starts automatically. For clips longer than about
-2.5 seconds, you'll also get a **suspicion timeline** — the clip is
-scored in overlapping 2-second windows so you can see *where* in the
-recording it looks most synthetic, instead of one number averaged across
-the whole thing (useful for spotting a spliced-in or partially-cloned
-segment in an otherwise real recording). You can download a JSON report
-of the full result, timeline included, via the button below. The sidebar
-keeps a running history of everything scanned in the current browser tab
+Either way, analysis starts automatically. Results include:
+
+- A **suspicion timeline** for clips longer than about 2.5 seconds — the
+  clip is scored in overlapping 2-second windows so you can see *where*
+  in the recording it looks most synthetic, instead of one number
+  averaged across the whole thing (useful for spotting a spliced-in or
+  partially-cloned segment in an otherwise real recording).
+- A **spectrogram** — a visual frequency-over-time view of the clip
+  (computed as a mel-spectrogram), rendered as a themed heatmap. Useful
+  for spotting things a plain waveform hides: unnatural frequency bands,
+  cut/splice points, or the kind of artifacts synthetic speech sometimes
+  leaves behind.
+
+You can download a JSON report of the full result (verdicts + suspicion
+timeline; the spectrogram itself isn't included, it's sized for display
+rather than a report) via the button below the charts. The sidebar keeps
+a running history of everything scanned in the current browser tab
 (persisted across a page refresh via `sessionStorage`, cleared when the
 tab closes).
 

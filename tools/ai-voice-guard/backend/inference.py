@@ -95,9 +95,44 @@ def compute_timeline(
     return points
 
 
-def analyze(audio_bytes: bytes, model_names: list[str], suffix: str = ".wav") -> dict:
+def compute_spectrogram(audio: np.ndarray, sr: int, n_mels: int = 80, max_frames: int = 240) -> dict:
+    """A mel-spectrogram in dB, downsampled to a JSON-friendly size.
+
+    n_mels=80 / max_frames=240 keeps the payload to roughly 80x240 floats
+    (~19k numbers) regardless of clip length, instead of scaling with
+    duration — a 30s clip and a 3s clip cost about the same to send.
+    """
+    mel = librosa.feature.melspectrogram(y=audio, sr=sr, n_mels=n_mels, fmax=sr / 2)
+    db = librosa.power_to_db(mel, ref=np.max)
+
+    if db.shape[1] > max_frames:
+        idx = np.linspace(0, db.shape[1] - 1, max_frames).astype(int)
+        db = db[:, idx]
+
+    return {
+        "z": np.round(db, 1).tolist(),  # [n_mels][frames], dB relative to clip peak
+        "duration": len(audio) / sr,
+        "n_mels": n_mels,
+    }
+
+
+def analyze(
+    audio_bytes: bytes,
+    model_names: list[str],
+    suffix: str = ".wav",
+    include_extras: bool = True,
+) -> dict:
+    """include_extras=False skips the timeline/waveform/spectrogram — used
+    by the live-recording ticker, which calls this every ~1.5s and only
+    needs the bare fake-probability number back as fast as possible.
+    """
     audio, sr = decode_audio(audio_bytes, suffix=suffix)
     results = [run_model(audio, name) for name in model_names]
+    duration = len(audio) / sr
+
+    if not include_extras:
+        return {"results": results, "duration": duration}
+
     timeline = compute_timeline(audio, sr, model_names[0])
 
     step = max(1, len(audio) // 2000)
@@ -106,8 +141,9 @@ def analyze(audio_bytes: bytes, model_names: list[str], suffix: str = ".wav") ->
 
     return {
         "results": results,
-        "duration": len(audio) / sr,
+        "duration": duration,
         "timeline": timeline,
         "timeline_model": model_names[0],
         "waveform": {"x": waveform_x, "y": waveform_y},
+        "spectrogram": compute_spectrogram(audio, sr),
     }

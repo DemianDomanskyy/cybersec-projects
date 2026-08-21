@@ -80,6 +80,10 @@
         <p class="dim">Record a few seconds from your mic.</p>
         <button id="record-btn" class="btn btn-primary">Start recording</button>
         <span id="record-status" class="dim"></span>
+        <div id="live-gauge-wrap" class="chart-box chart-section" hidden>
+          <div class="chart-caption">LIVE — updating as you speak</div>
+          <div id="live-gauge"></div>
+        </div>
       </div>
 
       <audio id="audio-preview" controls hidden></audio>

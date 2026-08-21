@@ -80,6 +80,7 @@ def list_models(session: str = Depends(auth.require_session)):
 async def analyze(
     file: UploadFile = File(...),
     models: str = Form(...),
+    extras: bool = Form(True),
     session: str = Depends(auth.require_session),
 ):
     model_names = json.loads(models)
@@ -92,7 +93,7 @@ async def analyze(
     audio_bytes = await file.read()
     suffix = Path(file.filename or "clip.wav").suffix or ".wav"
     try:
-        result = inference.analyze(audio_bytes, model_names, suffix=suffix)
+        result = inference.analyze(audio_bytes, model_names, suffix=suffix, include_extras=extras)
     except Exception as exc:
         raise HTTPException(
             status_code=400,
