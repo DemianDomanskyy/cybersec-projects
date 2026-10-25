@@ -532,12 +532,21 @@ function buildConsensus(results) {
   const fakeVotes = results.filter((r) => r.is_fake).length;
   const total = results.length;
   const avgFakeProb = results.reduce((s, r) => s + r.fake_prob, 0) / total;
-  const majorityFake = fakeVotes > total / 2;
-  const label = majorityFake ? "AI-generated" : "Human";
-  const icon = majorityFake ? "⚠️" : "✅";
+  // Flag as AI-generated if ANY model says so, not a majority. With a mixed
+  // pool of independently-trained classifiers, some models are reliably
+  // blind to certain fake styles (e.g. voice-conversion clips) while still
+  // being useful on others -- requiring a majority lets those blind spots
+  // silently veto a correct catch from a model that *did* pick it up.
+  // Measured against a labeled deepfake set: majority-vote caught 0% of
+  // known fakes (two models never crossed the fake threshold at all);
+  // any-model-flags caught ~46%, for a modest rise in false positives.
+  // See tools/ai-voice-guard/test-samples/ for the test harness + results.
+  const anyFake = fakeVotes >= 1;
+  const label = anyFake ? "AI-generated" : "Human";
+  const icon = anyFake ? "⚠️" : "✅";
   const div = document.createElement("div");
   div.className = "consensus-banner";
-  div.innerHTML = `${icon} <b>${fakeVotes} of ${total} models</b> say <b>${label}</b> · average fake-voice probability ${(avgFakeProb * 100).toFixed(1)}%`;
+  div.innerHTML = `${icon} <b>${fakeVotes} of ${total} models</b> flag <b>${label}</b> · average fake-voice probability ${(avgFakeProb * 100).toFixed(1)}%`;
   return div;
 }
 
@@ -729,7 +738,8 @@ function downloadReport(analysis, sourceLabel) {
 function addHistory(sourceLabel, analysis) {
   const results = analysis.results;
   const fakeVotes = results.filter((r) => r.is_fake).length;
-  const isFake = fakeVotes > results.length / 2;
+  // Matches buildConsensus(): any model flagging fake counts as fake overall.
+  const isFake = fakeVotes >= 1;
   const avgConfidence = results.reduce((s, r) => s + r.confidence, 0) / results.length;
   state.history.unshift({
     time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),

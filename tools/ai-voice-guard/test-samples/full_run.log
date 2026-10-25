@@ -1,0 +1,92 @@
+Testing 64 clips (8 REAL / 56 FAKE), 30s window each.
+
+[1/64] REAL  biden-original.wav ... Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]Loading weights:   1%|1         | 6/426 [00:00<00:10, 41.80it/s]Loading weights:   3%|2         | 11/426 [00:00<00:09, 43.47it/s]Loading weights:   4%|3         | 16/426 [00:00<00:09, 43.96it/s]Loading weights:   6%|6         | 26/426 [00:00<00:06, 58.20it/s]Loading weights:   8%|8         | 35/426 [00:00<00:05, 65.96it/s]Loading weights:  10%|9         | 42/426 [00:00<00:09, 39.12it/s]Loading weights:  11%|#1        | 48/426 [00:01<00:09, 39.85it/s]Loading weights:  12%|#2        | 53/426 [00:01<00:09, 39.71it/s]Loading weights:  15%|#4        | 63/426 [00:01<00:07, 48.37it/s]Loading weights:  16%|#6        | 69/426 [00:01<00:08, 43.28it/s]Loading weights:  17%|#7        | 74/426 [00:01<00:10, 33.98it/s]Loading weights:  19%|#9        | 82/426 [00:01<00:08, 38.66it/s]Loading weights:  23%|##3       | 100/426 [00:02<00:05, 60.25it/s]Loading weights:  26%|##6       | 111/426 [00:02<00:04, 69.26it/s]Loading weights:  33%|###3      | 142/426 [00:02<00:02, 113.61it/s]Loading weights:  49%|####8     | 208/426 [00:02<00:00, 237.16it/s]Loading weights: 100%|##########| 426/426 [00:02<00:00, 172.26it/s]
+Loading weights:   0%|          | 0/215 [00:00<?, ?it/s]Loading weights:   5%|5         | 11/215 [00:00<00:02, 92.32it/s]Loading weights:  10%|9         | 21/215 [00:00<00:02, 93.85it/s]Loading weights:  31%|###       | 66/215 [00:00<00:00, 232.42it/s]Loading weights:  41%|####1     | 89/215 [00:00<00:00, 199.26it/s]Loading weights:  70%|#######   | 151/215 [00:00<00:00, 320.38it/s]Loading weights: 100%|##########| 215/215 [00:00<00:00, 351.99it/s]
+Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]Loading weights:   3%|2         | 12/426 [00:00<00:04, 100.37it/s]Loading weights:   5%|5         | 23/426 [00:00<00:09, 44.05it/s] Loading weights:   7%|7         | 30/426 [00:00<00:07, 50.28it/s]Loading weights:   9%|9         | 39/426 [00:00<00:06, 59.56it/s]Loading weights:  11%|#1        | 47/426 [00:00<00:06, 58.39it/s]Loading weights:  13%|#2        | 54/426 [00:00<00:06, 53.34it/s]Loading weights:  19%|#8        | 80/426 [00:01<00:03, 101.08it/s]Loading weights:  22%|##1       | 92/426 [00:01<00:03, 102.35it/s]Loading weights:  24%|##4       | 104/426 [00:01<00:04, 78.59it/s]Loading weights:  27%|##6       | 114/426 [00:01<00:04, 62.70it/s]Loading weights:  29%|##8       | 122/426 [00:01<00:05, 51.21it/s]Loading weights:  30%|###       | 129/426 [00:02<00:05, 50.42it/s]Loading weights: 100%|##########| 426/426 [00:02<00:00, 197.35it/s]
+Loading weights:   0%|          | 0/215 [00:00<?, ?it/s]Loading weights:   3%|3         | 7/215 [00:00<00:03, 61.90it/s]Loading weights:   7%|6         | 14/215 [00:00<00:03, 58.21it/s]Loading weights:   9%|9         | 20/215 [00:00<00:03, 58.66it/s]Loading weights:  21%|##1       | 46/215 [00:00<00:01, 130.11it/s]Loading weights:  33%|###3      | 72/215 [00:00<00:00, 167.72it/s]Loading weights:  41%|####1     | 89/215 [00:00<00:01, 121.26it/s]Loading weights: 100%|##########| 215/215 [00:00<00:00, 264.75it/s]
+consensus=REAL (2/4 fake) [66.2s]
+[2/64] REAL  linus-original.wav ... consensus=REAL (1/4 fake) [53.6s]
+[3/64] REAL  margot-original.wav ... consensus=REAL (0/4 fake) [54.4s]
+[4/64] REAL  musk-original.wav ... consensus=REAL (0/4 fake) [53.7s]
+[5/64] REAL  obama-original.wav ... consensus=REAL (1/4 fake) [54.4s]
+[6/64] REAL  ryan-original.wav ... consensus=REAL (0/4 fake) [54.9s]
+[7/64] REAL  taylor-original.wav ... consensus=REAL (0/4 fake) [49.8s]
+[8/64] REAL  trump-original.wav ... consensus=REAL (0/4 fake) [55.3s]
+[9/64] FAKE  Obama-to-Biden.wav ... consensus=REAL (0/4 fake) [55.2s]
+[10/64] FAKE  Obama-to-Trump.wav ... consensus=REAL (0/4 fake) [54.0s]
+[11/64] FAKE  biden-to-Obama.wav ... consensus=REAL (1/4 fake) [51.9s]
+[12/64] FAKE  biden-to-Trump.wav ... consensus=REAL (0/4 fake) [55.1s]
+[13/64] FAKE  biden-to-linus.wav ... consensus=REAL (1/4 fake) [54.4s]
+[14/64] FAKE  biden-to-margot.wav ... consensus=REAL (1/4 fake) [54.6s]
+[15/64] FAKE  biden-to-musk.wav ... consensus=REAL (0/4 fake) [53.1s]
+[16/64] FAKE  biden-to-ryan.wav ... consensus=REAL (2/4 fake) [51.5s]
+[17/64] FAKE  biden-to-taylor.wav ... consensus=REAL (1/4 fake) [54.5s]
+[18/64] FAKE  linus-to-biden.wav ... consensus=REAL (1/4 fake) [55.0s]
+[19/64] FAKE  linus-to-margot.wav ... consensus=REAL (1/4 fake) [55.3s]
+[20/64] FAKE  linus-to-musk.wav ... consensus=REAL (1/4 fake) [55.1s]
+[21/64] FAKE  linus-to-obama.wav ... consensus=REAL (1/4 fake) [54.7s]
+[22/64] FAKE  linus-to-ryan.wav ... consensus=REAL (1/4 fake) [53.9s]
+[23/64] FAKE  linus-to-taylor.wav ... consensus=REAL (1/4 fake) [55.0s]
+[24/64] FAKE  linus-to-trump.wav ... consensus=REAL (0/4 fake) [46.3s]
+[25/64] FAKE  margot-to-biden.wav ... consensus=REAL (0/4 fake) [26.9s]
+[26/64] FAKE  margot-to-linus.wav ... consensus=REAL (0/4 fake) [27.0s]
+[27/64] FAKE  margot-to-musk.wav ... consensus=REAL (0/4 fake) [27.3s]
+[28/64] FAKE  margot-to-obama.wav ... consensus=REAL (1/4 fake) [26.8s]
+[29/64] FAKE  margot-to-ryan.wav ... consensus=REAL (1/4 fake) [27.0s]
+[30/64] FAKE  margot-to-taylor.wav ... consensus=REAL (0/4 fake) [27.2s]
+[31/64] FAKE  margot-to-trump.wav ... consensus=REAL (0/4 fake) [31.3s]
+[32/64] FAKE  musk-to-biden.wav ... consensus=REAL (1/4 fake) [53.6s]
+[33/64] FAKE  musk-to-linus.wav ... consensus=REAL (1/4 fake) [53.4s]
+[34/64] FAKE  musk-to-margot.wav ... consensus=REAL (2/4 fake) [54.8s]
+[35/64] FAKE  musk-to-obama.wav ... consensus=REAL (1/4 fake) [55.1s]
+[36/64] FAKE  musk-to-ryan.wav ... consensus=REAL (2/4 fake) [54.3s]
+[37/64] FAKE  musk-to-taylor.wav ... consensus=REAL (1/4 fake) [43.5s]
+[38/64] FAKE  musk-to-trump.wav ... consensus=REAL (0/4 fake) [53.9s]
+[39/64] FAKE  obama-to-linus.wav ... consensus=REAL (0/4 fake) [54.6s]
+[40/64] FAKE  obama-to-margot.wav ... consensus=REAL (2/4 fake) [52.8s]
+[41/64] FAKE  obama-to-musk.wav ... consensus=REAL (0/4 fake) [53.6s]
+[42/64] FAKE  obama-to-ryan.wav ... consensus=REAL (2/4 fake) [54.5s]
+[43/64] FAKE  obama-to-taylor.wav ... consensus=REAL (0/4 fake) [55.0s]
+[44/64] FAKE  ryan-to-biden.wav ... consensus=REAL (0/4 fake) [55.1s]
+[45/64] FAKE  ryan-to-linus.wav ... consensus=REAL (0/4 fake) [54.6s]
+[46/64] FAKE  ryan-to-margot.wav ... consensus=REAL (0/4 fake) [54.7s]
+[47/64] FAKE  ryan-to-musk.wav ... consensus=REAL (0/4 fake) [54.5s]
+[48/64] FAKE  ryan-to-obama.wav ... consensus=REAL (0/4 fake) [54.9s]
+[49/64] FAKE  ryan-to-taylor.wav ... consensus=REAL (0/4 fake) [55.2s]
+[50/64] FAKE  ryan-to-trump.wav ... consensus=REAL (0/4 fake) [55.1s]
+[51/64] FAKE  taylor-to-biden.wav ... consensus=REAL (0/4 fake) [55.5s]
+[52/64] FAKE  taylor-to-linus.wav ... consensus=REAL (0/4 fake) [55.6s]
+[53/64] FAKE  taylor-to-margot.wav ... consensus=REAL (1/4 fake) [55.3s]
+[54/64] FAKE  taylor-to-musk.wav ... consensus=REAL (0/4 fake) [54.7s]
+[55/64] FAKE  taylor-to-obama.wav ... consensus=REAL (0/4 fake) [55.6s]
+[56/64] FAKE  taylor-to-ryan.wav ... consensus=REAL (1/4 fake) [54.3s]
+[57/64] FAKE  taylor-to-trump.wav ... consensus=REAL (0/4 fake) [55.4s]
+[58/64] FAKE  trump-to-Biden.wav ... consensus=REAL (0/4 fake) [54.7s]
+[59/64] FAKE  trump-to-Obama.wav ... consensus=REAL (1/4 fake) [54.9s]
+[60/64] FAKE  trump-to-linus.wav ... consensus=REAL (0/4 fake) [54.7s]
+[61/64] FAKE  trump-to-margot.wav ... consensus=REAL (2/4 fake) [54.7s]
+[62/64] FAKE  trump-to-musk.wav ... consensus=REAL (0/4 fake) [54.3s]
+[63/64] FAKE  trump-to-ryan.wav ... consensus=REAL (1/4 fake) [54.9s]
+[64/64] FAKE  trump-to-taylor.wav ... consensus=REAL (0/4 fake) [54.7s]
+
+============================================================
+RESULTS
+============================================================
+
+wav2vec2-XLSR (deepfake voice)
+  accuracy: 12.5%  (TP=0 TN=8 FP=0 FN=56)
+
+wav2vec2 (deepfake audio)
+  accuracy: 48.4%  (TP=25 TN=6 FP=2 FN=31)
+
+wav2vec2-XLSR-large (deepfake audio)
+  accuracy: 12.5%  (TP=0 TN=8 FP=0 FN=56)
+
+wav2vec2 (deepfake audio v2)
+  accuracy: 20.3%  (TP=7 TN=6 FP=2 FN=49)
+
+CONSENSUS (majority vote)
+  accuracy: 12.5%  (TP=0 TN=8 FP=0 FN=56)
+
+Total time: 3288.2s
+Full results written to C:\Users\dovgonosik\cybersec-projects\tools\ai-voice-guard\test-samples\results.json

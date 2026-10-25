@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .claude/
 .env
+tools/ai-voice-guard/test-samples/extracted/
+tools/ai-voice-guard/test-samples/_download/
