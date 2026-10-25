@@ -2,17 +2,27 @@
 
 import os
 import tempfile
+from pathlib import Path
 
+import joblib
 import librosa
 import numpy as np
 import torch
 from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
+
+# Sentinel model_id (not a HuggingFace repo id) that routes run_model()/
+# load_model() to the local classical-ML classifier below instead of a
+# wav2vec2 transformer.
+CUSTOM_MODEL_ID = "custom:voice-conversion-detector"
+CUSTOM_MODEL_PATH = Path(__file__).parent / "custom_model" / "voice_conversion_classifier.joblib"
+CUSTOM_WINDOW_S = 1.0  # must match test-samples/train_classifier.py's WINDOW_S
 
 MODELS = {
     "wav2vec2-XLSR (deepfake voice)": "garystafford/wav2vec2-deepfake-voice-detector",
     "wav2vec2 (deepfake audio)": "mo-thecreator/Deepfake-audio-detection",
     "wav2vec2-XLSR-large (deepfake audio)": "Gustking/wav2vec2-large-xlsr-deepfake-audio-classification",
     "wav2vec2 (deepfake audio v2)": "MelodyMachine/Deepfake-audio-detection-V2",
+    "Voice-conversion detector (custom, local)": CUSTOM_MODEL_ID,
 }
 DEFAULT_MODEL = "wav2vec2-XLSR (deepfake voice)"
 
@@ -21,11 +31,55 @@ _model_cache: dict[str, tuple] = {}
 
 def load_model(model_id: str):
     if model_id not in _model_cache:
-        feature_extractor = AutoFeatureExtractor.from_pretrained(model_id)
-        model = AutoModelForAudioClassification.from_pretrained(model_id)
-        model.eval()
-        _model_cache[model_id] = (feature_extractor, model)
+        if model_id == CUSTOM_MODEL_ID:
+            _model_cache[model_id] = joblib.load(CUSTOM_MODEL_PATH)
+        else:
+            feature_extractor = AutoFeatureExtractor.from_pretrained(model_id)
+            model = AutoModelForAudioClassification.from_pretrained(model_id)
+            model.eval()
+            _model_cache[model_id] = (feature_extractor, model)
     return _model_cache[model_id]
+
+
+def _extract_custom_features(audio: np.ndarray, sr: int, window_s: float = CUSTOM_WINDOW_S) -> list[list[float]]:
+    """One feature row per window_s window: chroma/RMS/spectral/MFCC means,
+    the same 26 columns (in the same order) used in
+    test-samples/train_classifier.py -- must stay in sync with that script.
+    """
+    window = int(window_s * sr)
+    if len(audio) < window:
+        audio = np.pad(audio, (0, window - len(audio)))
+    hop = window  # non-overlapping, matches training
+    rows = []
+    start = 0
+    while start + window <= len(audio):
+        seg = audio[start:start + window]
+        chroma = np.mean(librosa.feature.chroma_stft(y=seg, sr=sr))
+        rms = np.mean(librosa.feature.rms(y=seg))
+        centroid = np.mean(librosa.feature.spectral_centroid(y=seg, sr=sr))
+        bandwidth = np.mean(librosa.feature.spectral_bandwidth(y=seg, sr=sr))
+        rolloff = np.mean(librosa.feature.spectral_rolloff(y=seg, sr=sr))
+        zcr = np.mean(librosa.feature.zero_crossing_rate(y=seg))
+        mfcc = np.mean(librosa.feature.mfcc(y=seg, sr=sr, n_mfcc=20), axis=1)
+        rows.append([chroma, rms, centroid, bandwidth, rolloff, zcr, *mfcc])
+        start += hop
+    return rows
+
+
+def _run_custom_model(audio: np.ndarray, sr: int = 16000) -> dict:
+    bundle = load_model(CUSTOM_MODEL_ID)
+    rows = _extract_custom_features(audio, sr)
+    X = bundle["scaler"].transform(rows)
+    # predict_proba[:, 1] = P(fake) per window; average across windows for a
+    # single clip-level score, same spirit as the wav2vec2 path's single logits.
+    fake_prob = float(np.mean(bundle["model"].predict_proba(X)[:, 1]))
+    return {
+        "model_name": "Voice-conversion detector (custom, local)",
+        "model_id": CUSTOM_MODEL_ID,
+        "is_fake": fake_prob > 0.5,
+        "confidence": fake_prob if fake_prob > 0.5 else 1 - fake_prob,
+        "fake_prob": fake_prob,
+    }
 
 
 def _fake_label_index(id2label: dict) -> int:
@@ -48,6 +102,8 @@ def decode_audio(audio_bytes: bytes, suffix: str = ".wav"):
 
 def run_model(audio: np.ndarray, model_name: str) -> dict:
     model_id = MODELS[model_name]
+    if model_id == CUSTOM_MODEL_ID:
+        return _run_custom_model(audio)
     feature_extractor, model = load_model(model_id)
     inputs = feature_extractor(audio, sampling_rate=16000, return_tensors="pt", padding=True)
 

@@ -1,0 +1,64 @@
+{
+  "test_identities_held_out": [
+    "ryan",
+    "taylor"
+  ],
+  "window_s": 1.0,
+  "max_seconds_per_file": 180,
+  "train_rows_balanced": 1958,
+  "test_rows": 4142,
+  "results": {
+    "RandomForest": {
+      "accuracy": 0.7493964268469339,
+      "recall_fake": 0.7322305505298526,
+      "precision_fake": 0.9992945326278659,
+      "f1_fake": 0.8451670644391408,
+      "fp_rate_on_real": 0.007326007326007326,
+      "confusion_matrix": [
+        [
+          271,
+          2
+        ],
+        [
+          1036,
+          2833
+        ]
+      ]
+    },
+    "GradientBoosting": {
+      "accuracy": 0.769917914051183,
+      "recall_fake": 0.7554923752907728,
+      "precision_fake": 0.9976109215017065,
+      "f1_fake": 0.8598323282835711,
+      "fp_rate_on_real": 0.02564102564102564,
+      "confusion_matrix": [
+        [
+          266,
+          7
+        ],
+        [
+          946,
+          2923
+        ]
+      ]
+    },
+    "LogisticRegression": {
+      "accuracy": 0.7708836310960888,
+      "recall_fake": 0.7911605065908504,
+      "precision_fake": 0.9559650218613367,
+      "f1_fake": 0.8657898458492433,
+      "fp_rate_on_real": 0.5164835164835165,
+      "confusion_matrix": [
+        [
+          132,
+          141
+        ],
+        [
+          808,
+          3061
+        ]
+      ]
+    }
+  },
+  "best_model": "GradientBoosting"
+}

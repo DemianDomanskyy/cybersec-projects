@@ -90,17 +90,28 @@ under "Models to run":
 - **wav2vec2 (deepfake audio)**
 - **wav2vec2-XLSR-large (deepfake audio)**
 - **wav2vec2 (deepfake audio v2)**
+- **Voice-conversion detector (custom, local)** — see below.
 
 With one model selected, you get a single big verdict card (**SOUNDS
 HUMAN** / **SOUNDS AI-GENERATED**), a gauge showing the raw fake-voice
 probability, and a waveform view.
 
 With more than one model selected, you instead get a consensus banner
-("3 of 4 models say AI-generated · average fake-voice probability 81%")
+("3 of 4 models flag AI-generated · average fake-voice probability 81%")
 plus a small card per model showing its individual verdict and confidence
 — useful for seeing whether the models agree, rather than trusting a
 single classifier blindly. Changing which models are selected re-runs the
 analysis automatically on whatever clip is currently loaded.
+
+The overall verdict is **any model flags it → flagged**, not a majority.
+Testing against a labeled deepfake set showed why: these four models were
+evidently trained on different fake styles, and some are reliably blind to
+styles the others catch. Requiring a majority meant a model's correct catch
+could be silently overruled by others that never would have caught it
+either way — measured consensus recall on that test set was 0% under
+majority vote vs. ~46% under any-model-flags, for a modest rise in false
+positives. Treat the per-model breakdown as the real signal; the banner is
+just "did anything go off," not a vote tally to trust blindly.
 
 There are two ways to submit audio:
 
@@ -144,6 +155,58 @@ ambiguous; don't read too much into small differences near that line. For
 anything where the answer actually matters (verifying a call, a claim, a
 piece of evidence), corroborate with another method rather than relying on
 this alone.
+
+**Known blind spot:** all four wav2vec2 models struggle specifically with
+voice-conversion-style fakes (the same speaker's real words/cadence with
+just the timbre swapped onto another identity — e.g. RVC/so-vits output),
+as opposed to TTS/vocoder-style synthesis. Tested against a labeled
+Kaggle set of voice-conversion clips, the best of the four models still
+only caught ~46% of known fakes; two of the four essentially never flagged
+one (near-zero fake-probability on every fake sample tested, not just
+uncertain). If you specifically need to catch cloned-voice calls or
+conversion-style spoofing, don't treat a "SOUNDS HUMAN" verdict here as
+reassurance — corroborate some other way. See
+`tools/ai-voice-guard/test-samples/` for the test harness and full
+results if you want to reproduce or extend this.
+
+### The "Voice-conversion detector (custom, local)" model
+
+Built specifically to cover the blind spot above. It's not a transformer —
+there's no GPU on the reference dev machine, and full fine-tuning of a
+wav2vec2 model on CPU wasn't practical. Instead it's a **GradientBoosting
+classifier over classical audio features** (chroma, RMS, spectral
+centroid/bandwidth/rolloff, zero-crossing rate, 20 MFCCs — averaged per
+1-second window, clip score = mean probability across windows), trained on
+the same Kaggle voice-conversion dataset used for testing above.
+
+**Methodology, so the numbers below can be trusted:** the dataset has 8
+speaker identities, each voice-converted to/from every other identity (56
+clips) plus 8 original "real" recordings. 2 of the 8 identities (`ryan`,
+`taylor`) were held out of training *entirely* — not just their files, but
+every fake clip involving them as either source or target — so evaluation
+measures generalization to voices the model never saw, not memorization of
+a specific recording's background noise or channel characteristics. Model
+selection (GradientBoosting over RandomForest/LogisticRegression) was by
+F1 score with a hard reject on >15% false-positive rate, specifically
+because an earlier pass on raw recall alone selected a model that flagged
+52% of real audio as fake — useless for a tool meant to be trusted.
+
+**Held-out-identity results:** 75.5% recall on fakes it never saw in
+training, 99.8% precision, 2.6% false-positive rate on real audio. That's
+a meaningful jump over the best wav2vec2 model's ~46% recall on the same
+attack style, with far fewer false alarms.
+
+**Scope limitation — read this before trusting it broadly:** this model
+is trained and validated *only* on this one Kaggle voice-conversion
+dataset — 8 English-speaking public figures, one conversion technique,
+studio-ish audio quality. It has not been tested against TTS-based fakes,
+other conversion techniques, other languages, phone-quality audio, or
+adversarial/noisy conditions. Treat it as a specialist for exactly the
+attack style it was trained on, not a general-purpose replacement for the
+other four models — run it *alongside* them, not instead of them.
+Training script, full metrics, and the exact train/test split are in
+`tools/ai-voice-guard/test-samples/train_classifier.py` and
+`train_results.json`.
 
 ## Troubleshooting
 

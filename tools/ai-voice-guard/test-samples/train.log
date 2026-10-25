@@ -1,0 +1,90 @@
+Train identities: REAL=6 files, FAKE pairs=30 files
+Test (held-out) identities: REAL=2 files, FAKE pairs=26 files
+Held-out test identities: ['ryan', 'taylor']
+
+Extracting TRAIN features...
+  [train] REAL biden-original.wav: 180 segments [5s elapsed]
+  [train] REAL linus-original.wav: 180 segments [9s elapsed]
+  [train] REAL margot-original.wav: 79 segments [10s elapsed]
+  [train] REAL musk-original.wav: 180 segments [14s elapsed]
+  [train] REAL obama-original.wav: 180 segments [18s elapsed]
+  [train] REAL trump-original.wav: 180 segments [22s elapsed]
+  [train] FAKE Obama-to-Biden.wav: 180 segments [25s elapsed]
+  [train] FAKE Obama-to-Trump.wav: 180 segments [29s elapsed]
+  [train] FAKE biden-to-Obama.wav: 180 segments [32s elapsed]
+  [train] FAKE biden-to-Trump.wav: 180 segments [36s elapsed]
+  [train] FAKE biden-to-linus.wav: 180 segments [40s elapsed]
+  [train] FAKE biden-to-margot.wav: 180 segments [44s elapsed]
+  [train] FAKE biden-to-musk.wav: 180 segments [48s elapsed]
+  [train] FAKE linus-to-biden.wav: 180 segments [51s elapsed]
+  [train] FAKE linus-to-margot.wav: 180 segments [55s elapsed]
+  [train] FAKE linus-to-musk.wav: 180 segments [59s elapsed]
+  [train] FAKE linus-to-obama.wav: 180 segments [63s elapsed]
+  [train] FAKE linus-to-trump.wav: 180 segments [66s elapsed]
+  [train] FAKE margot-to-biden.wav: 79 segments [68s elapsed]
+  [train] FAKE margot-to-linus.wav: 79 segments [69s elapsed]
+  [train] FAKE margot-to-musk.wav: 79 segments [71s elapsed]
+  [train] FAKE margot-to-obama.wav: 79 segments [72s elapsed]
+  [train] FAKE margot-to-trump.wav: 79 segments [74s elapsed]
+  [train] FAKE musk-to-biden.wav: 180 segments [78s elapsed]
+  [train] FAKE musk-to-linus.wav: 180 segments [82s elapsed]
+  [train] FAKE musk-to-margot.wav: 180 segments [85s elapsed]
+  [train] FAKE musk-to-obama.wav: 180 segments [89s elapsed]
+  [train] FAKE musk-to-trump.wav: 180 segments [93s elapsed]
+  [train] FAKE obama-to-linus.wav: 180 segments [97s elapsed]
+  [train] FAKE obama-to-margot.wav: 180 segments [101s elapsed]
+  [train] FAKE obama-to-musk.wav: 180 segments [104s elapsed]
+  [train] FAKE trump-to-Biden.wav: 180 segments [108s elapsed]
+  [train] FAKE trump-to-Obama.wav: 180 segments [111s elapsed]
+  [train] FAKE trump-to-linus.wav: 180 segments [115s elapsed]
+  [train] FAKE trump-to-margot.wav: 180 segments [119s elapsed]
+  [train] FAKE trump-to-musk.wav: 180 segments [123s elapsed]
+
+Extracting TEST features...
+  [test] REAL ryan-original.wav: 93 segments [2s elapsed]
+  [test] REAL taylor-original.wav: 180 segments [6s elapsed]
+  [test] FAKE biden-to-ryan.wav: 180 segments [9s elapsed]
+  [test] FAKE biden-to-taylor.wav: 180 segments [13s elapsed]
+  [test] FAKE linus-to-ryan.wav: 180 segments [16s elapsed]
+  [test] FAKE linus-to-taylor.wav: 180 segments [20s elapsed]
+  [test] FAKE margot-to-ryan.wav: 79 segments [21s elapsed]
+  [test] FAKE margot-to-taylor.wav: 79 segments [23s elapsed]
+  [test] FAKE musk-to-ryan.wav: 180 segments [27s elapsed]
+  [test] FAKE musk-to-taylor.wav: 180 segments [31s elapsed]
+  [test] FAKE obama-to-ryan.wav: 180 segments [34s elapsed]
+  [test] FAKE obama-to-taylor.wav: 180 segments [38s elapsed]
+  [test] FAKE ryan-to-biden.wav: 93 segments [40s elapsed]
+  [test] FAKE ryan-to-linus.wav: 93 segments [42s elapsed]
+  [test] FAKE ryan-to-margot.wav: 93 segments [44s elapsed]
+  [test] FAKE ryan-to-musk.wav: 93 segments [45s elapsed]
+  [test] FAKE ryan-to-obama.wav: 93 segments [47s elapsed]
+  [test] FAKE ryan-to-taylor.wav: 93 segments [49s elapsed]
+  [test] FAKE ryan-to-trump.wav: 93 segments [51s elapsed]
+  [test] FAKE taylor-to-biden.wav: 180 segments [55s elapsed]
+  [test] FAKE taylor-to-linus.wav: 180 segments [59s elapsed]
+  [test] FAKE taylor-to-margot.wav: 180 segments [63s elapsed]
+  [test] FAKE taylor-to-musk.wav: 180 segments [67s elapsed]
+  [test] FAKE taylor-to-obama.wav: 180 segments [70s elapsed]
+  [test] FAKE taylor-to-ryan.wav: 180 segments [74s elapsed]
+  [test] FAKE taylor-to-trump.wav: 180 segments [77s elapsed]
+  [test] FAKE trump-to-ryan.wav: 180 segments [83s elapsed]
+  [test] FAKE trump-to-taylor.wav: 180 segments [89s elapsed]
+
+Raw train rows: 5874 (real=979, fake=4895)
+Raw test rows: 4142 (real=273, fake=3869)
+Balanced train rows: 1958
+
+RandomForest (trained in 1.9s, segment-level eval on held-out identities ['ryan', 'taylor']):
+  accuracy=74.9%  recall(fake)=73.2%  precision(fake)=99.9%  f1=84.5%  fp_rate_on_real=0.7%  confusion=[[271, 2], [1036, 2833]]
+
+GradientBoosting (trained in 6.1s, segment-level eval on held-out identities ['ryan', 'taylor']):
+  accuracy=77.0%  recall(fake)=75.5%  precision(fake)=99.8%  f1=86.0%  fp_rate_on_real=2.6%  confusion=[[266, 7], [946, 2923]]
+
+LogisticRegression (trained in 0.1s, segment-level eval on held-out identities ['ryan', 'taylor']):
+  accuracy=77.1%  recall(fake)=79.1%  precision(fake)=95.6%  f1=86.6%  fp_rate_on_real=51.6%  confusion=[[132, 141], [808, 3061]]
+  -> rejected: false-positive rate 51.6% exceeds 15% threshold, too noisy to ship
+
+Best model by F1 (among candidates under 15% FP rate): GradientBoosting
+
+Saved classifier to C:\Users\dovgonosik\cybersec-projects\tools\ai-voice-guard\backend\custom_model\voice_conversion_classifier.joblib
+Saved metrics to test-samples/train_results.json
